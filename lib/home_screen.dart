@@ -1,23 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:hive_flutter/hive_flutter.dart';
-import 'package:intl/intl.dart';
-import 'package:todolist_app/main.dart';
+import 'package:provider/provider.dart';
+import 'package:todolist_app/task_provider.dart';
 
-class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+class HomeScreen extends StatelessWidget {
+  const HomeScreen({Key? key}) : super(key: key);
 
-  @override
-  State<HomeScreen> createState() => _HomeScreenState();
-}
-
-class _HomeScreenState extends State<HomeScreen> {
-  late Box<Todo> todoBox;
-  void initState() {
-    super.initState();
-    todoBox = Hive.box<Todo>("todo");
-  }
   @override
   Widget build(BuildContext context) {
+    final TaskProvider taskProvider = Provider.of<TaskProvider>(context);
     return Scaffold(
       backgroundColor: Color(0xFF1d2630),
       appBar: AppBar(
@@ -26,18 +16,17 @@ class _HomeScreenState extends State<HomeScreen> {
         foregroundColor: Colors.white,
         title: Text("Lista de tarefas"),
       ),
-      body: ValueListenableBuilder(
-        valueListenable: todoBox.listenable(),
-        builder: (context, Box<Todo> box, _){
+      body: Consumer<TaskProvider>(
+        builder: (context, taskProvider, _) {
           return ListView.builder(
-            itemCount: box.length,
-            itemBuilder: (context, index){
-              Todo todo = box.getAt(index)!;
+            itemCount: taskProvider.tasks.length,
+            itemBuilder: (context, index) {
+              final todo = taskProvider.tasks[index];
               return Container(
                 margin: EdgeInsets.all(10),
                 decoration: BoxDecoration(
                   color: todo.isCompleted ? Colors.white : Colors.white,
-                  borderRadius: BorderRadius.circular(10)
+                  borderRadius: BorderRadius.circular(10),
                 ),
                 child: Dismissible(
                   key: Key(todo.dateTime.toString()),
@@ -51,26 +40,25 @@ class _HomeScreenState extends State<HomeScreen> {
                       color: Colors.white,
                     ),
                   ),
-                  onDismissed: (direction){
-                    setState(() {
-                      todo.delete();
-                    });
+                  onDismissed: (direction) {
+                    taskProvider.removeTask(index);
                   },
                   child: ListTile(
                     title: Text(todo.title),
                     subtitle: Text(todo.description),
-                    trailing: Text(
-                      DateFormat.yMMMd().format(todo.dateTime),
-                      ),
-                      leading: Checkbox(
-                        value: todo.isCompleted,
-                        onChanged: (value){
-                          setState(() {
-                            todo.isCompleted = value!;
-                            todo.save();
-                          });
-                        },
-                      ),
+                    trailing: Text(todo.dateTime.toString()),
+                    leading: Checkbox(
+                      value: todo.isCompleted,
+                      onChanged: (value) {
+                        final updatedTodo = Todo(
+                          title: todo.title,
+                          description: todo.description,
+                          dateTime: todo.dateTime,
+                          isCompleted: value!,
+                        );
+                        taskProvider.updateTask(index, updatedTodo);
+                      },
+                    ),
                   ),
                 ),
               );
@@ -79,20 +67,20 @@ class _HomeScreenState extends State<HomeScreen> {
         },
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: (){
+        onPressed: () {
           _addTodoDialog(context);
         },
         child: Icon(Icons.add),
-        ),
+      ),
     );
   }
 
-  void _addTodoDialog(BuildContext context){
+  void _addTodoDialog(BuildContext context) {
     TextEditingController _titleController = TextEditingController();
     TextEditingController _descController = TextEditingController();
 
     showDialog(
-      context: context, 
+      context: context,
       builder: (context) => AlertDialog(
         title: Text("Adicionar tarefa"),
         content: Column(
@@ -102,7 +90,6 @@ class _HomeScreenState extends State<HomeScreen> {
               controller: _titleController,
               decoration: InputDecoration(labelText: "Título"),
             ),
-
             TextField(
               controller: _descController,
               decoration: InputDecoration(labelText: "Descricao"),
@@ -111,28 +98,29 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         actions: [
           TextButton(
-            onPressed:(){
-              Navigator.pop(context);
-            },
-            child: Text("Cancelar")
-          ),
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              child: Text("Cancelar")),
           TextButton(
-            onPressed: () {
-              _addTodo(_titleController.text, _descController.text);
-              Navigator.pop(context);
-          }, 
-          child: Text("Adicionar"))
-        ]
+              onPressed: () {
+                _addTodo(_titleController.text, _descController.text, context);
+                Navigator.pop(context);
+              },
+              child: Text("Adicionar"))
+        ],
       ),
     );
   }
 
-  void _addTodo(String title, String description){
-    if(title.isNotEmpty){
-      todoBox.add(
-        Todo(title: title,
-        description: description,
-        dateTime: DateTime.now()
+  void _addTodo(String title, String description, BuildContext context) {
+    if (title.isNotEmpty) {
+      final taskProvider = Provider.of<TaskProvider>(context, listen: false);
+      taskProvider.addTask(
+        Todo(
+          title: title,
+          description: description,
+          dateTime: DateTime.now(),
         ),
       );
     }
